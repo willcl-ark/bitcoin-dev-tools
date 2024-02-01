@@ -53,8 +53,8 @@ Typical usage for a new user might there be:
 
 6. Make some changes to the code...
 
-7. Check the branch is good, run `just check` and `just format-commit` on each new commit in the branch:
+7. Check all new commits in the branch are good, shortcut to run `just check` on each new commit in the branch:
 
     ```bash
-    just full-check
+    just prepare
     ```

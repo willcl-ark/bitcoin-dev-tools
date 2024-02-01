@@ -109,7 +109,8 @@ rebase-master *args:
 # Check each commit in the branch passes `check` & `format-commit`
 [no-exit-message]
 [confirm("Warning, unsaved changes may be lost. Continue?")]
-full-test:
+[no-exit-message]
+prepare:
     git rebase -i `git merge-base HEAD upstream/master` \
     --exec "just check" \
     --exec "just format-commit"
