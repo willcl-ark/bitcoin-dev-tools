@@ -19,7 +19,7 @@ I use `export MAKE_CMD="bear -- make"` so that a `compile_commands.json` is gene
 
 ### Usage
 
-Typical usage for a new user might there be:
+Typical usage for a user of this justfile might be:
 
 1. Show main dependencies for your OS, installing them per the instructions:
 
@@ -27,7 +27,7 @@ Typical usage for a new user might there be:
     just show-deps
     ```
 
-2. Install the python dependencies needed for linting:
+2. (optional) Install the python dependencies needed for linting:
 
     ```bash
     just install-python-deps
@@ -45,7 +45,7 @@ Typical usage for a new user might there be:
     just test
     ```
 
-5. Run linters:
+5. (optional) Run linters:
 
     ```bash
     just lint

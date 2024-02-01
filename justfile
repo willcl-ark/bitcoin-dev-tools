@@ -1,11 +1,9 @@
 set dotenv-load := true
 
 make_command := env('MAKE_CMD', 'make')
-os  := os()
+os := os()
 
-[private]
 alias cs := compile-slim
-[private]
 alias ms := make-slim
 
 ######################
@@ -69,7 +67,31 @@ test-func test:
 test-unit suite:
     test_bitcoin --log_level=all --run_test={{ suite }}
 
-# Run all linters
+# Run clang-format-diff on top commit
+[no-exit-message]
+[private]
+format-commit:
+    git diff -U0 HEAD~1.. | ./contrib/devtools/clang-format-diff.py -p1 -i -v
+
+# Run clang-format on the diff (must be configured with clang)
+[no-exit-message]
+format-diff:
+    git diff | ./contrib/devtools/clang-format-diff.py -p1 -i -v
+
+# Run clang-tidy on top commit
+[no-exit-message]
+[private]
+tidy-commit:
+    make clean && bear --config src/.bear-tidy-config -- make -j `nproc`
+    git diff -U0 HEAD~1.. | ( cd ./src/ && clang-tidy-diff -p2 -j $(nproc) )
+
+# Run clang-tidy on the diff (must be configured with clang)
+[no-exit-message]
+tidy-diff:
+    make clean && bear --config src/.bear-tidy-config -- make -j `nproc`
+    git diff | ( cd ./src/ && clang-tidy-diff -p2 -j $(nproc) )
+
+# Run all linters, clang-format and clang-tidy on top commit
 lint:
     #!/usr/bin/env bash
     # use subshell to load any python venv for flake8
@@ -77,26 +99,15 @@ lint:
     cargo fmt
     cargo clippy
     cargo run
-
-# Run clang-format-diff on top commit
-[no-exit-message]
-format-commit:
-    git diff -U0 HEAD~1.. | ./contrib/devtools/clang-format-diff.py -p1 -i -v
+    just format-commit
+    just tidy-commit
 
 # Lint, build and test
 check: lint compile test-func-all
 
-# Run clang-tidy-diff on changed lines
-[no-exit-message]
-tidy:
-    ./autogen.sh
-    ./configure CC=clang CXX=clang++
-    make clean && bear --config src/.bear-tidy-config -- make -j `nproc`
-    git diff | ( cd ./src/ && clang-tidy-diff -p2 -j $(nproc) )
-
 # Interactive rebase current branch from (git merge-base) (`just rebase -i` for interactive)
-[no-exit-message]
 [confirm("Warning, unsaved changes may be lost. Continue?")]
+[no-exit-message]
 rebase *args:
     git rebase {{ args }} `git merge-base HEAD upstream/master`
 
@@ -106,14 +117,20 @@ rebase-master *args:
     git fetch upstream
     git rebase {{ args }} `git merge-base HEAD upstream/master`
 
-# Check each commit in the branch passes `check` & `format-commit`
+# Check each commit in the branch passes `just lint`
+[confirm("Warning, unsaved changes may be lost. Continue?")]
 [no-exit-message]
+[private]
+rebase-lint:
+    git rebase -i `git merge-base HEAD upstream/master` \
+    --exec "just lint" \
+
+# Check each commit in the branch passes `just check`
 [confirm("Warning, unsaved changes may be lost. Continue?")]
 [no-exit-message]
 prepare:
     git rebase -i `git merge-base HEAD upstream/master` \
     --exec "just check" \
-    --exec "just format-commit"
 
 # Git range-diff from <old-rev> to HEAD~ against master
 [no-exit-message]
@@ -147,17 +164,7 @@ install-python-deps:
     # This is currently unversioned in our repo
     pip3 install vulture
 
-deps_command := if os == "linux" {
-        "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md"
-    } else if  os == "macos" {
-        "open https://github.com/bitcoin/bitcoin/blob/master/doc/build-osx.md"
-    } else if os == "windows" {
-        "explorer https://github.com/bitcoin/bitcoin/blob/master/doc/build-windows.md"
-    } else if os == "freebsd" {
-        "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-freebsd.md"
-    } else {
-        "echo see https://github.com/bitcoin/bitcoin/tree/master/doc#building for build instructions"
-    }
+deps_command := if os == "linux" { "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md" } else { if os == "macos" { "open https://github.com/bitcoin/bitcoin/blob/master/doc/build-osx.md" } else { if os == "windows" { "explorer https://github.com/bitcoin/bitcoin/blob/master/doc/build-windows.md" } else { if os == "freebsd" { "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-freebsd.md" } else { "echo see https://github.com/bitcoin/bitcoin/tree/master/doc#building for build instructions" } } } }
 
 # Show project dependencies in browser
 show-deps:
