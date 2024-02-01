@@ -132,3 +132,7 @@ bench:
 fetch:
     git fetch
     git reset --hard FETCH_HEAD
+
+# Verify scripted diffs from master to HEAD~
+verify-scripted-diff:
+    test/lint/commit-script-check.sh origin/master..HEAD
