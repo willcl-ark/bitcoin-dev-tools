@@ -136,3 +136,11 @@ fetch:
 # Verify scripted diffs from master to HEAD~
 verify-scripted-diff:
     test/lint/commit-script-check.sh origin/master..HEAD
+
+# Install python deps from ci/lint/install.sh
+install-python-deps:
+    awk '/^\$\{CI_RETRY_EXE\} pip3 install \\/,/^$/{if (!/^\$\{CI_RETRY_EXE\} pip3 install \\/ && !/^$/) print}' ci/lint/04_install.sh \
+        | sed 's/\\$//g' \
+        | xargs pip3 install
+    # This is currently unversioned in our repo
+    pip3 install vulture
