@@ -1,6 +1,7 @@
 set dotenv-load := true
 
 make_command := env('MAKE_CMD', 'make')
+os  := os()
 
 [private]
 alias cs := compile-slim
@@ -144,3 +145,19 @@ install-python-deps:
         | xargs pip3 install
     # This is currently unversioned in our repo
     pip3 install vulture
+
+deps_command := if os == "linux" {
+        "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md"
+    } else if  os == "macos" {
+        "open https://github.com/bitcoin/bitcoin/blob/master/doc/build-osx.md"
+    } else if os == "windows" {
+        "explorer https://github.com/bitcoin/bitcoin/blob/master/doc/build-windows.md"
+    } else if os == "freebsd" {
+        "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-freebsd.md"
+    } else {
+        "echo see https://github.com/bitcoin/bitcoin/tree/master/doc#building for build instructions"
+    }
+
+# Show project dependencies in browser
+show-deps:
+    {{ deps_command }}
