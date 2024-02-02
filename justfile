@@ -171,3 +171,14 @@ deps_command := if os == "linux" { "xdg-open https://github.com/bitcoin/bitcoin/
 # Show project dependencies in browser
 show-deps:
     {{ deps_command }}
+
+# Build depends
+@build-depends:
+    echo "Detected arch: .... {{ arch() }}"
+    echo "Detected os: ...... {{ os() }}"
+    @make -j`nproc`
+    echo
+    echo To use, run configure using your host triplet, e.g.:
+    echo \"CONFIG_SITE=$PWD/depends/x86_64-pc-linux-gnu/share/config.site ./configure\"
+    echo
+    echo For available host-triplets see: https://github.com/bitcoin/bitcoin/tree/master/depends
