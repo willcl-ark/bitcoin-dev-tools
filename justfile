@@ -1,4 +1,6 @@
 set dotenv-load := true
+set shell := ["bash", "-uc"]
+
 
 make_command := env('MAKE_CMD', 'make')
 os := os()
