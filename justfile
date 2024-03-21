@@ -1,11 +1,13 @@
 set dotenv-load := true
 set shell := ["bash", "-uc"]
 
-make_command := env('MAKE_CMD', 'make')
+make_cmd := env('MAKE_CMD', 'bear  --config src/.bear-tidy-config -- make -j `nproc`')
 os := os()
 
-alias cs := compile-slim
-alias ms := make-slim
+alias bm := build-min
+alias rb := rebuild-min
+alias c := check
+alias b := build
 
 ######################
 ###### recipes #######
@@ -15,37 +17,52 @@ alias ms := make-slim
 default:
     just --list
 
-# Full configure with optional <args>
+# Full configure with --enable-debug and optional <args>
 configure *args:
+    #!/usr/bin/env bash
+    if [ ! -f ./configure ]; then
     ./autogen.sh
+    fi
     ./configure --enable-debug {{ args }}
 
-# Minimal configure
+# Minimal configure with --enable-debug and optional <args>
 [private]
-configure-slim:
+configure-min *args:
+    #!/usr/bin/env bash
+    if [ ! -f ./configure ]; then
     ./autogen.sh
-    ./configure --without-bdb --without-miniupnpc --without-natpmp --disable-bench --without-gui --enable-debug
+    fi
+    ./configure --without-bdb --without-miniupnpc --without-natpmp --disable-bench --without-gui --enable-debug {{ args }}
 
-# Make current configuration
-make:
-    {{ make_command }} -j`nproc`
-
-# Make bitcoind and bitcoin-cli only (faster)
+# Make helper
 [private]
-make-slim:
-    {{ make_command }} -j`nproc` -C src bitcoind bitcoin-cli
+make:
+    {{ make_cmd }}
 
+# make-min helper
+[private]
+make-min:
+    {{ make_cmd }} -C src bitcoind bitcoin-cli
+
+# Make clean helper
+[private]
+make-clean:
+    {{ make_cmd }} clean
+
+# Clean, configure and build bitcoind and bitcoin-cli
+build-min: make-clean configure-min make-min
+
+# Remake bitcoind and bitcoin-cli only using current configuration
+rebuild-min: make-min
+
+# Clean, configure and build everything
+build: make-clean configure make
+
+# make clean and make check
 [private]
 make-check:
-    {{ make_command }} -j`nproc` clean
-    {{ make_command }} -j`nproc` check
-
-# Clean default compile with --enable-debug
-compile: configure make-check
-
-# Clean minimal compile with --enable-debug
-[private]
-compile-slim: configure-slim make-check
+    {{ make_cmd }} clean
+    {{ make_cmd }} check
 
 # Run all functional tests
 [private]
@@ -55,7 +72,7 @@ test-func-all:
 # Run all unit tests
 [private]
 test-unit-all:
-    {{ make_command }} -j`nproc` check
+    {{ make_cmd }} check
 
 # Run all unit and functional tests
 test: test-unit-all test-func-all
@@ -76,6 +93,7 @@ format-commit:
 
 # Run clang-format on the diff (must be configured with clang)
 [no-exit-message]
+[private]
 format-diff:
     git diff | ./contrib/devtools/clang-format-diff.py -p1 -i -v
 
@@ -83,28 +101,36 @@ format-diff:
 [no-exit-message]
 [private]
 tidy-commit:
-    make clean && bear --config src/.bear-tidy-config -- make -j `nproc`
-    git diff -U0 HEAD~1.. | ( cd ./src/ && clang-tidy-diff -p2 -j $(nproc) )
+    git diff -U0 HEAD~1.. | ( cd ./src/ && clang-tidy-diff-17.py -p2 -j $(nproc) )
 
 # Run clang-tidy on the diff (must be configured with clang)
 [no-exit-message]
+[private]
 tidy-diff:
-    make clean && bear --config src/.bear-tidy-config -- make -j `nproc`
-    git diff | ( cd ./src/ && clang-tidy-diff -p2 -j $(nproc) )
+    git diff | ( cd ./src/ && clang-tidy-diff-17.py -p2 -j $(nproc) )
 
-# Run all linters, clang-format and clang-tidy on top commit
-lint:
+# Lint helper
+[private]
+lint-generic:
     #!/usr/bin/env bash
     # use subshell to load any python venv for flake8
     cd test/lint/test_runner/
     cargo fmt
     cargo clippy
     cargo run
+
+# Run all linters, clang-format and clang-tidy on top commit
+lint-commit: lint-generic
     just format-commit
     just tidy-commit
 
-# Lint, build and test
-check: lint compile test-func-all
+# Run all linters, clang-format and clang-tidy on diff
+lint-diff: lint-generic
+    just format-diff
+    just tidy-diff
+
+# Lint (top commit), build and test
+check: lint-commit configure make-check test-func-all
 
 # Interactive rebase current branch from (git merge-base) (`just rebase -i` for interactive)
 [confirm("Warning, unsaved changes may be lost. Continue?")]
@@ -114,7 +140,7 @@ rebase *args:
 
 # Update upstream/master and interactive rebase on it (`just rebase-master -i` for interactive)
 [confirm("Warning, unsaved changes may be lost. Continue?")]
-rebase-master *args:
+rebase-upstream *args:
     git fetch upstream
     git rebase {{ args }} `git merge-base HEAD upstream/master`
 
@@ -147,12 +173,6 @@ profile pid:
 bench:
     src/bench/bench_bitcoin
 
-# Fetch lastest (force) push of current branch and apply it
-[confirm("Warning, unsaved changes may be lost. About to `git reset --hard FETCH_HEAD`. Continue?")]
-fetch:
-    git fetch
-    git reset --hard FETCH_HEAD
-
 # Verify scripted diffs from master to HEAD~
 verify-scripted-diff:
     test/lint/commit-script-check.sh origin/master..HEAD
@@ -162,8 +182,8 @@ install-python-deps:
     awk '/^\$\{CI_RETRY_EXE\} pip3 install \\/,/^$/{if (!/^\$\{CI_RETRY_EXE\} pip3 install \\/ && !/^$/) print}' ci/lint/04_install.sh \
         | sed 's/\\$//g' \
         | xargs pip3 install
-    # This is currently unversioned in our repo
-    pip3 install vulture
+    pip3 install vulture # currently unversioned in our repo
+    pip3 install requests # only used in getcoins.py
 
 deps_command := if os == "linux" { "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md" } else { if os == "macos" { "open https://github.com/bitcoin/bitcoin/blob/master/doc/build-osx.md" } else { if os == "windows" { "explorer https://github.com/bitcoin/bitcoin/blob/master/doc/build-windows.md" } else { if os == "freebsd" { "xdg-open https://github.com/bitcoin/bitcoin/blob/master/doc/build-freebsd.md" } else { "echo see https://github.com/bitcoin/bitcoin/tree/master/doc#building for build instructions" } } } }
 

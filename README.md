@@ -63,7 +63,7 @@ Typical usage for a user of this justfile might be:
 3. Compile the current branch with default configuration:
 
     ```bash
-    just compile
+    just build
     ```
 
 4. Check all tests are passing:
@@ -72,7 +72,7 @@ Typical usage for a user of this justfile might be:
     just test
     ```
 
-5. (optional) Run linters:
+5. Run linters:
 
     ```bash
     just lint
@@ -80,7 +80,7 @@ Typical usage for a user of this justfile might be:
 
 6. Make some changes to the code...
 
-7. Check all new commits in the branch are good, shortcut to run `just check` on each new commit in the branch:
+7. Check all new commits in the branch are good, shortcut to run `just check` on each new commit in the branch vs master:
 
     ```bash
     just prepare
