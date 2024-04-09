@@ -109,9 +109,8 @@ tidy-commit:
 tidy-diff:
     git diff | ( cd ./src/ && clang-tidy-diff-17.py -p2 -j $(nproc) )
 
-# Lint helper
-[private]
-lint-generic:
+# Run the linter
+lint:
     #!/usr/bin/env bash
     # use subshell to load any python venv for flake8
     cd test/lint/test_runner/
@@ -120,12 +119,12 @@ lint-generic:
     cargo run
 
 # Run all linters, clang-format and clang-tidy on top commit
-lint-commit: lint-generic
+lint-commit: lint
     just format-commit
     just tidy-commit
 
 # Run all linters, clang-format and clang-tidy on diff
-lint-diff: lint-generic
+lint-diff: lint
     just format-diff
     just tidy-diff
 
