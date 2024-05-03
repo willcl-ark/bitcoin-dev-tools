@@ -47,7 +47,7 @@ make-min:
 # Make clean helper
 [private]
 make-clean:
-    {{ make_cmd }} clean
+    {{ make_cmd }} clean || true
 
 # Clean, configure and build bitcoind and bitcoin-cli
 build-min: make-clean configure-min make-min
@@ -116,7 +116,7 @@ lint:
     cd test/lint/test_runner/
     cargo fmt
     cargo clippy
-    cargo run
+    COMMIT_RANGE="$( git rev-list --max-count=1 --merges HEAD )..HEAD" cargo run
 
 # Run all linters, clang-format and clang-tidy on top commit
 lint-commit: lint
