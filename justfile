@@ -1,13 +1,12 @@
 set dotenv-load := true
 set shell := ["bash", "-uc"]
 
-make_cmd := env('MAKE_CMD', 'bear  --config src/.bear-tidy-config -- make -j `nproc`')
 os := os()
 
-alias bm := build-min
-alias rb := rebuild-min
+alias rb := rebuild
 alias c := check
 alias b := build
+alias p := prepare
 
 ######################
 ###### recipes #######
@@ -17,80 +16,66 @@ alias b := build
 default:
     just --list
 
-# Full configure with --enable-debug and optional <args>
+# Build default project
 [group('build')]
-configure *args:
-    #!/usr/bin/env bash
-    if [ ! -f ./configure ]; then
-    ./autogen.sh
-    fi
-    ./configure --enable-debug {{ args }}
+build:
+    rm -Rf build
+    mkdir build
+    cmake -B build \
+        -DCMAKE_BUILD_TYPE=Debug \
+    cmake --build build -j `nproc`
 
-# Minimal configure with --enable-debug and optional <args>
-[private]
-configure-min *args:
-    #!/usr/bin/env bash
-    if [ ! -f ./configure ]; then
-    ./autogen.sh
-    fi
-    ./configure --disable-bench --without-gui --disable-fuzz --disable-fuzz-binary --without-utils --enable-util-cli --enable-debug --with-incompatible-bdb {{ args }}
-
-# Make helper
-[private]
-make:
-    {{ make_cmd }}
-
-# make-min helper
-[private]
-make-min:
-    {{ make_cmd }} -C src bitcoind bitcoin-cli
-
-# Make clean helper
-[private]
-make-clean:
-    {{ make_cmd }} clean || true
-
-# Clean, configure and build bitcoind and bitcoin-cli
+# Build with all optional modules
 [group('build')]
-build-min: make-clean configure-min make-min
+build-all:
+    rm -Rf build
+    mkdir build
+    cmake -B build \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DBUILD_BENCH=ON \
+        -DBUILD_FUZZ_BINARY=ON \
+        -DBUILD_GUI=ON \
+        -DBUILD_KERNEL_LIB=ON \
+        -DBUILD_UTIL_CHAINSTATE=ON \
+        -DWITH_MINIUPNPC:BOOL=ON \
+        -DWITH_USDT=ON \
+        -DWITH_ZMQ=ON
+    cmake --build build -j `nproc`
 
-# Remake bitcoind and bitcoin-cli only using current configuration
+# Re-build current config
 [group('build')]
-rebuild-min: make-min
+rebuild:
+    cmake --build build
 
-# Clean, configure and build everything
+
+# Clean build dir
 [group('build')]
-build: make-clean configure make
+clean:
+    rm -Rf build
 
-# make clean and make check
-[private]
-make-check:
-    {{ make_cmd }} clean
-    {{ make_cmd }} check
+# Run unit tests
+[group('test')]
+test-unit:
+    ctest --test-dir build
 
 # Run all functional tests
-[private]
-test-func-all:
+[group('test')]
+test-func:
     test/functional/test_runner.py --jobs=`nproc`
-
-# Run all unit tests
-[private]
-test-unit-all:
-    {{ make_cmd }} check
 
 # Run all unit and functional tests
 [group('test')]
-test: test-unit-all test-func-all
+test: test-unit test-func
 
 # Run a single functional test (filename.py)
 [group('test')]
-test-func test:
+test-func1 test:
     test/functional/test_runner.py {{ test }}
 
 # Run a single unit test suite
 [group('test')]
-test-unit suite:
-    test_bitcoin --log_level=all --run_test={{ suite }}
+test-unit1 suite:
+    build/src/test/test_bitcoin --log_level=all --run_test={{ suite }}
 
 # Run clang-format-diff on top commit
 [no-exit-message]
@@ -139,21 +124,19 @@ lint-diff: lint
     just tidy-diff
 
 # Lint (top commit), build and test
-[group('build')]
-[group('test')]
-[group('lint')]
-check: lint-commit configure make-check test-func-all
+[group('pr tools')]
+check: lint-commit build test-func-all
 
 # Interactive rebase current branch from (git merge-base) (`just rebase -i` for interactive)
 [confirm("Warning, unsaved changes may be lost. Continue?")]
 [no-exit-message]
-[group('build')]
+[group('git')]
 rebase *args:
     git rebase {{ args }} `git merge-base HEAD upstream/master`
 
 # Update upstream/master and interactive rebase on it (`just rebase-master -i` for interactive)
 [confirm("Warning, unsaved changes may be lost. Continue?")]
-[group('build')]
+[group('git')]
 rebase-upstream *args:
     git fetch upstream
     git rebase {{ args }} `git merge-base HEAD upstream/master`
@@ -169,6 +152,7 @@ rebase-lint:
 # Check each commit in the branch passes `just check`
 [confirm("Warning, unsaved changes may be lost. Continue?")]
 [no-exit-message]
+[group('pr tools')]
 prepare:
     git rebase -i `git merge-base HEAD upstream/master` \
     --exec "just check" \
@@ -181,12 +165,12 @@ range-diff old-rev:
 
 # Profile a running bitcoind for 60 seconds (e.g. just profile `pgrep bitcoind`). Outputs perf.data
 [no-exit-message]
-[group('tools')]
+[group('perf')]
 profile pid:
     perf record -g --call-graph dwarf --per-thread -F 140 -p {{ pid }} -- sleep 60
 
 # Run benchmarks
-[group('tools')]
+[group('perf')]
 bench:
     src/bench/bench_bitcoin
 
