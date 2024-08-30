@@ -22,7 +22,7 @@ build:
     rm -Rf build
     mkdir build
     cmake -B build \
-        -DCMAKE_BUILD_TYPE=Debug \
+        -DCMAKE_BUILD_TYPE=Debug
     cmake --build build -j `nproc`
 
 # Build with all optional modules
