@@ -61,7 +61,7 @@ test-unit:
 # Run all functional tests
 [group('test')]
 test-func:
-    test/functional/test_runner.py --jobs=`nproc`
+    build/test/functional/test_runner.py --jobs=`nproc`
 
 # Run all unit and functional tests
 [group('test')]
@@ -70,7 +70,7 @@ test: test-unit test-func
 # Run a single functional test (filename.py)
 [group('test')]
 test-func1 test:
-    test/functional/test_runner.py {{ test }}
+    build/test/functional/test_runner.py {{ test }}
 
 # Run a single unit test suite
 [group('test')]
@@ -202,7 +202,7 @@ build-depends:
     echo "Detected os: ...... {{ os() }}"
     cd depends && make -j`nproc`
     echo
-    echo To use, run configure using your host triplet, e.g.:
-    echo \"CONFIG_SITE=$PWD/depends/x86_64-pc-linux-gnu/share/config.site ./configure\"
+    echo To use, run cmake using the toolchain of your host triplet, e.g.:
+    echo cmake -B build --toolchain depends/x86_64-pc-linux-gnu/toolchain.cmake
     echo
     echo For available host-triplets see: https://github.com/bitcoin/bitcoin/tree/master/depends
